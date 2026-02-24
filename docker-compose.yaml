@@ -8,8 +8,8 @@ services:
     env_file:
       - .env
     networks:
-      - kortregt
+      - kortregt_network
 
 networks:
-  kortregt:
+  kortregt_network:
     external: true
