@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Movie Picker</title>
+    <link rel="stylesheet" href="/static/css/styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Movie Picker</h1>
+            <p class="subtitle">Letterboxd + Jellyfin</p>
+        </header>
+
+        <nav class="tabs">
+            <button class="tab active" data-tab="random">Random Picker</button>
+            <button class="tab" data-tab="overlap">Friend Overlap</button>
+            <button class="tab" data-tab="missing">Movies to Add</button>
+        </nav>
+
+        <!-- Random Picker Tab -->
+        <section id="tab-random" class="tab-content active">
+            <div class="filters-section">
+                <button id="toggle-filters" class="btn-secondary">Show Filters</button>
+                <div id="filters-panel" class="filters-panel hidden">
+                    <div class="filter-group">
+                        <label for="genre-select">Genre:</label>
+                        <select id="genre-select" multiple></select>
+                    </div>
+                    <div class="filter-group">
+                        <label>Year Range:</label>
+                        <div class="range-inputs">
+                            <input type="number" id="year-min" placeholder="Min" min="1900" max="2100">
+                            <span>to</span>
+                            <input type="number" id="year-max" placeholder="Max" min="1900" max="2100">
+                        </div>
+                    </div>
+                    <div class="filter-group">
+                        <label>Runtime (min):</label>
+                        <div class="range-inputs">
+                            <input type="number" id="runtime-min" placeholder="Min" min="0">
+                            <span>to</span>
+                            <input type="number" id="runtime-max" placeholder="Max" min="0">
+                        </div>
+                    </div>
+                    <button id="clear-filters" class="btn-secondary">Clear Filters</button>
+                </div>
+            </div>
+            <div class="action-section">
+                <button id="get-movie-btn" class="btn-primary">Pick Random Movie</button>
+            </div>
+            <div id="random-loading" class="loading hidden">
+                <div class="spinner"></div>
+                <p>Finding a movie...</p>
+            </div>
+            <div id="random-error" class="error-message hidden"></div>
+            <div id="movie-card" class="movie-card hidden">
+                <div class="movie-poster">
+                    <img id="movie-image" src="" alt="Movie poster">
+                </div>
+                <div class="movie-details">
+                    <h2 id="movie-title"></h2>
+                    <div class="movie-meta">
+                        <span id="movie-year" class="meta-item"></span>
+                        <span id="movie-runtime" class="meta-item"></span>
+                    </div>
+                    <div id="movie-genres" class="genres"></div>
+                    <p id="movie-overview" class="overview"></p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Friend Overlap Tab -->
+        <section id="tab-overlap" class="tab-content">
+            <div class="overlap-controls">
+                <label class="toggle-label">
+                    <input type="checkbox" id="jellyfin-only">
+                    Only show movies on Jellyfin
+                </label>
+                <button id="overlap-random-btn" class="btn-primary">Pick Random from Overlap</button>
+            </div>
+            <div id="overlap-loading" class="loading hidden">
+                <div class="spinner"></div>
+                <p>Loading watchlists...</p>
+            </div>
+            <div id="overlap-error" class="error-message hidden"></div>
+            <div id="overlap-random-result" class="overlap-random-result hidden"></div>
+            <div id="overlap-list" class="movie-list"></div>
+            <div id="overlap-empty" class="empty-state hidden">
+                <p>No overlapping movies found across your friends' watchlists.</p>
+            </div>
+        </section>
+
+        <!-- Movies to Add Tab -->
+        <section id="tab-missing" class="tab-content">
+            <div id="missing-loading" class="loading hidden">
+                <div class="spinner"></div>
+                <p>Loading watchlists...</p>
+            </div>
+            <div id="missing-error" class="error-message hidden"></div>
+            <div id="missing-list" class="movie-list"></div>
+            <div id="missing-empty" class="empty-state hidden">
+                <p>All movies from your friends' watchlists are already on Jellyfin!</p>
+            </div>
+        </section>
+
+        <footer>
+            <button id="refresh-cache" class="btn-secondary btn-small">Refresh Cache</button>
+        </footer>
+    </div>
+
+    <script src="/static/js/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,452 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+:root {
+    --primary: #00b020;
+    --primary-hover: #009a1c;
+    --bg: #14181c;
+    --bg-light: #1c2228;
+    --bg-card: #242c34;
+    --text: #d8d8d8;
+    --text-muted: #9ab;
+    --text-bright: #fff;
+    --border: #2c3440;
+    --danger: #e74c3c;
+    --success: #00b020;
+    --letterboxd-orange: #ff8000;
+    --radius: 6px;
+    --shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+}
+
+.container {
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+/* Header */
+header {
+    text-align: center;
+    margin-bottom: 24px;
+}
+
+header h1 {
+    font-size: 2rem;
+    color: var(--text-bright);
+}
+
+.subtitle {
+    color: var(--text-muted);
+    font-size: 0.9rem;
+}
+
+/* Tabs */
+.tabs {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 24px;
+    border-bottom: 2px solid var(--border);
+    padding-bottom: 0;
+}
+
+.tab {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    padding: 10px 20px;
+    cursor: pointer;
+    font-size: 0.95rem;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -2px;
+    transition: color 0.2s, border-color 0.2s;
+}
+
+.tab:hover {
+    color: var(--text);
+}
+
+.tab.active {
+    color: var(--primary);
+    border-bottom-color: var(--primary);
+}
+
+.tab-content {
+    display: none;
+}
+
+.tab-content.active {
+    display: block;
+}
+
+/* Filters */
+.filters-section {
+    margin-bottom: 20px;
+}
+
+.filters-panel {
+    background: var(--bg-card);
+    padding: 16px;
+    border-radius: var(--radius);
+    margin-top: 10px;
+}
+
+.filter-group {
+    margin-bottom: 12px;
+}
+
+.filter-group label {
+    display: block;
+    margin-bottom: 4px;
+    font-size: 0.85rem;
+    color: var(--text-muted);
+}
+
+.filter-group input,
+.filter-group select {
+    padding: 8px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    font-size: 14px;
+    background: var(--bg-light);
+    color: var(--text);
+}
+
+.filter-group select {
+    width: 100%;
+    height: 100px;
+}
+
+.range-inputs {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.range-inputs input {
+    flex: 1;
+}
+
+.range-inputs span {
+    color: var(--text-muted);
+}
+
+/* Buttons */
+.btn-primary,
+.btn-secondary {
+    padding: 10px 20px;
+    border: none;
+    border-radius: var(--radius);
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.btn-primary {
+    background: var(--primary);
+    color: #fff;
+    font-weight: 600;
+}
+
+.btn-primary:hover {
+    background: var(--primary-hover);
+}
+
+.btn-primary:disabled {
+    background: var(--border);
+    cursor: not-allowed;
+}
+
+.btn-secondary {
+    background: var(--bg-card);
+    color: var(--text);
+    border: 1px solid var(--border);
+}
+
+.btn-secondary:hover {
+    background: var(--bg-light);
+}
+
+.btn-small {
+    padding: 6px 14px;
+    font-size: 0.8rem;
+}
+
+.action-section {
+    margin: 16px 0;
+    text-align: center;
+}
+
+/* Overlap controls */
+.overlap-controls {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+}
+
+.toggle-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--text-muted);
+    font-size: 0.9rem;
+    cursor: pointer;
+}
+
+.toggle-label input[type="checkbox"] {
+    accent-color: var(--primary);
+}
+
+/* Loading */
+.loading {
+    text-align: center;
+    margin: 40px 0;
+    color: var(--text-muted);
+}
+
+.spinner {
+    border: 3px solid var(--border);
+    border-top: 3px solid var(--primary);
+    border-radius: 50%;
+    width: 32px;
+    height: 32px;
+    animation: spin 0.8s linear infinite;
+    margin: 0 auto 10px;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+/* Error */
+.error-message {
+    background: rgba(231, 76, 60, 0.15);
+    color: var(--danger);
+    padding: 12px 16px;
+    border-radius: var(--radius);
+    margin: 16px 0;
+    border-left: 3px solid var(--danger);
+    font-size: 0.9rem;
+}
+
+/* Movie Card (random picker) */
+.movie-card {
+    background: var(--bg-card);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 20px;
+    margin-top: 20px;
+    display: grid;
+    grid-template-columns: 180px 1fr;
+    gap: 20px;
+}
+
+.movie-poster img {
+    width: 100%;
+    border-radius: var(--radius);
+}
+
+.movie-details h2 {
+    color: var(--text-bright);
+    margin-bottom: 8px;
+    font-size: 1.3rem;
+}
+
+.movie-meta {
+    display: flex;
+    gap: 16px;
+    margin-bottom: 12px;
+    color: var(--text-muted);
+    font-size: 0.9rem;
+}
+
+.genres {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 12px;
+}
+
+.genre-tag {
+    background: var(--bg-light);
+    color: var(--text-muted);
+    padding: 3px 10px;
+    border-radius: 12px;
+    font-size: 0.8rem;
+    border: 1px solid var(--border);
+}
+
+.overview {
+    color: var(--text-muted);
+    font-size: 0.9rem;
+    line-height: 1.7;
+}
+
+/* Movie List (overlap & missing tabs) */
+.movie-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.movie-list-item {
+    background: var(--bg-card);
+    border-radius: var(--radius);
+    padding: 14px 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.movie-list-item .movie-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.movie-list-item .movie-title {
+    color: var(--text-bright);
+    font-weight: 600;
+    font-size: 0.95rem;
+}
+
+.movie-list-item .movie-title a {
+    color: inherit;
+    text-decoration: none;
+}
+
+.movie-list-item .movie-title a:hover {
+    color: var(--primary);
+}
+
+.movie-list-item .movie-year {
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    margin-left: 6px;
+}
+
+.movie-list-item .movie-badges {
+    display: flex;
+    gap: 4px;
+    flex-wrap: wrap;
+    margin-top: 4px;
+}
+
+.friend-badge {
+    background: var(--bg-light);
+    color: var(--text-muted);
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 0.75rem;
+    border: 1px solid var(--border);
+}
+
+.jellyfin-status {
+    font-size: 0.8rem;
+    padding: 3px 10px;
+    border-radius: 10px;
+    white-space: nowrap;
+}
+
+.jellyfin-status.available {
+    background: rgba(0, 176, 32, 0.15);
+    color: var(--success);
+}
+
+.jellyfin-status.unavailable {
+    background: rgba(231, 76, 60, 0.15);
+    color: var(--danger);
+}
+
+/* Overlap random result */
+.overlap-random-result {
+    background: var(--bg-card);
+    border: 2px solid var(--primary);
+    border-radius: var(--radius);
+    padding: 16px;
+    margin-bottom: 16px;
+    text-align: center;
+}
+
+.overlap-random-result .picked-title {
+    color: var(--text-bright);
+    font-size: 1.2rem;
+    font-weight: 700;
+}
+
+.overlap-random-result .picked-year {
+    color: var(--text-muted);
+}
+
+.overlap-random-result .picked-friends {
+    margin-top: 8px;
+}
+
+/* Empty state */
+.empty-state {
+    text-align: center;
+    color: var(--text-muted);
+    padding: 40px 20px;
+}
+
+/* Utility */
+.hidden {
+    display: none !important;
+}
+
+/* Footer */
+footer {
+    text-align: center;
+    margin-top: 40px;
+    padding: 16px;
+}
+
+/* Responsive */
+@media (max-width: 640px) {
+    header h1 {
+        font-size: 1.5rem;
+    }
+
+    .tabs {
+        gap: 0;
+    }
+
+    .tab {
+        padding: 8px 12px;
+        font-size: 0.85rem;
+    }
+
+    .movie-card {
+        grid-template-columns: 1fr;
+    }
+
+    .movie-poster {
+        text-align: center;
+    }
+
+    .movie-poster img {
+        max-width: 200px;
+    }
+
+    .overlap-controls {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .movie-list-item {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+}
