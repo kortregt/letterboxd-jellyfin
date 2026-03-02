@@ -84,7 +84,7 @@ async def get_genres():
 
 @router.get("/api/friends")
 async def get_friends():
-    return {"friends": Config.LETTERBOXD_FRIENDS}
+    return {"friends": Config.LETTERBOXD_FRIENDS, "nicknames": Config.LETTERBOXD_NICKNAMES}
 
 
 @router.get("/api/watchlists")

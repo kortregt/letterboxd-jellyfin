@@ -14,6 +14,11 @@ class Config:
         if u.strip()
     ]
     CACHE_TTL_SECONDS = int(os.getenv("CACHE_TTL_SECONDS", "3600"))
+    LETTERBOXD_NICKNAMES = {}
+    for pair in os.getenv("LETTERBOXD_NICKNAMES", "").split(","):
+        if "=" in pair:
+            uname, nick = pair.split("=", 1)
+            LETTERBOXD_NICKNAMES[uname.strip()] = nick.strip()
 
     @staticmethod
     def validate():

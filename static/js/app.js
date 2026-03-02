@@ -18,6 +18,7 @@ let missingLoaded = false;
 let overlapData = [];
 let missingData = [];
 let allFriends = [];
+let nicknames = {};
 
 // ── Random Picker ──
 
@@ -133,6 +134,7 @@ async function loadFriends() {
         if (!res.ok) return;
         const data = await res.json();
         allFriends = data.friends || [];
+        nicknames = data.nicknames || {};
         renderFriendFilter('overlap-friend-filter', renderOverlap);
         renderFriendFilter('missing-friend-filter', renderMissing);
     } catch (e) {
@@ -140,12 +142,16 @@ async function loadFriends() {
     }
 }
 
+function displayName(username) {
+    return nicknames[username] || username;
+}
+
 function renderFriendFilter(containerId, onChange) {
     const container = document.getElementById(containerId);
     container.innerHTML = allFriends.map(f => `
         <label class="friend-chip">
             <input type="checkbox" value="${esc(f)}" checked>
-            <span>${esc(f)}</span>
+            <span>${esc(displayName(f))}</span>
         </label>
     `).join('');
     container.querySelectorAll('input').forEach(cb => {
@@ -223,7 +229,7 @@ async function pickRandomOverlap() {
             <div class="picked-title">${esc(data.name)}</div>
             <div class="picked-year">${data.year || ''}</div>
             <div class="picked-friends">
-                ${(data.wanted_by || []).map(f => `<span class="friend-badge">${esc(f)}</span>`).join(' ')}
+                ${(data.wanted_by || []).map(f => `<span class="friend-badge">${esc(displayName(f))}</span>`).join(' ')}
             </div>
             ${data.url ? `<a href="${esc(data.url)}" target="_blank" style="color: var(--primary); font-size: 0.85rem;">View on Letterboxd</a>` : ''}
         `;
@@ -280,7 +286,7 @@ function movieListItem(movie, showJellyfinStatus) {
         : esc(movie.name);
     const year = movie.year ? `<span class="movie-year">(${movie.year})</span>` : '';
     const badges = (movie.wanted_by || [])
-        .map(f => `<span class="friend-badge">${esc(f)}</span>`).join('');
+        .map(f => `<span class="friend-badge">${esc(displayName(f))}</span>`).join('');
 
     let statusHtml = '';
     if (showJellyfinStatus) {
