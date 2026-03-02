@@ -16,10 +16,12 @@ document.querySelectorAll('.tab').forEach(tab => {
 let overlapLoaded = false;
 let missingLoaded = false;
 let overlapData = [];
+let missingData = [];
+let allFriends = [];
 
 // ── Random Picker ──
 
-document.addEventListener('DOMContentLoaded', loadGenres);
+document.addEventListener('DOMContentLoaded', () => { loadGenres(); loadFriends(); });
 
 document.getElementById('get-movie-btn').addEventListener('click', fetchRandomMovie);
 document.getElementById('toggle-filters').addEventListener('click', () => {
@@ -123,6 +125,46 @@ function displayMovie(movie) {
     document.getElementById('movie-card').classList.remove('hidden');
 }
 
+// ── Friend Filter ──
+
+async function loadFriends() {
+    try {
+        const res = await fetch('/api/friends');
+        if (!res.ok) return;
+        const data = await res.json();
+        allFriends = data.friends || [];
+        renderFriendFilter('overlap-friend-filter', renderOverlap);
+        renderFriendFilter('missing-friend-filter', renderMissing);
+    } catch (e) {
+        console.error('Failed to load friends:', e);
+    }
+}
+
+function renderFriendFilter(containerId, onChange) {
+    const container = document.getElementById(containerId);
+    container.innerHTML = allFriends.map(f => `
+        <label class="friend-chip">
+            <input type="checkbox" value="${esc(f)}" checked>
+            <span>${esc(f)}</span>
+        </label>
+    `).join('');
+    container.querySelectorAll('input').forEach(cb => {
+        cb.addEventListener('change', onChange);
+    });
+}
+
+function getSelectedFriends(containerId) {
+    return Array.from(document.querySelectorAll(`#${containerId} input:checked`))
+        .map(cb => cb.value);
+}
+
+function filterByFriends(movies, selectedFriends) {
+    if (selectedFriends.length === allFriends.length) return movies;
+    return movies.filter(m =>
+        selectedFriends.every(f => (m.wanted_by || []).includes(f))
+    );
+}
+
 // ── Friend Overlap ──
 
 document.getElementById('overlap-random-btn').addEventListener('click', pickRandomOverlap);
@@ -152,8 +194,9 @@ function renderOverlap() {
     const list = document.getElementById('overlap-list');
     const empty = document.getElementById('overlap-empty');
     const jellyfinOnly = document.getElementById('jellyfin-only').checked;
+    const selectedFriends = getSelectedFriends('overlap-friend-filter');
 
-    let movies = overlapData;
+    let movies = filterByFriends(overlapData, selectedFriends);
     if (jellyfinOnly) {
         movies = movies.filter(m => m.on_jellyfin);
     }
@@ -203,23 +246,30 @@ async function loadMissing() {
         const data = await res.json();
         if (!res.ok) throw new Error(data.error);
 
-        const movies = data.movies || [];
-        const list = document.getElementById('missing-list');
-        const empty = document.getElementById('missing-empty');
-
-        if (!movies.length) {
-            list.innerHTML = '';
-            empty.classList.remove('hidden');
-        } else {
-            empty.classList.add('hidden');
-            list.innerHTML = movies.map(m => movieListItem(m, false)).join('');
-        }
+        missingData = data.movies || [];
         missingLoaded = true;
+        renderMissing();
     } catch (e) {
         showError('missing-error', e.message || 'Failed to load data');
     } finally {
         loading.classList.add('hidden');
     }
+}
+
+function renderMissing() {
+    const list = document.getElementById('missing-list');
+    const empty = document.getElementById('missing-empty');
+    const selectedFriends = getSelectedFriends('missing-friend-filter');
+
+    const movies = filterByFriends(missingData, selectedFriends);
+
+    if (!movies.length) {
+        list.innerHTML = '';
+        empty.classList.remove('hidden');
+        return;
+    }
+    empty.classList.add('hidden');
+    list.innerHTML = movies.map(m => movieListItem(m, false)).join('');
 }
 
 // ── Shared helpers ──
@@ -274,6 +324,7 @@ document.getElementById('refresh-cache').addEventListener('click', async () => {
         overlapLoaded = false;
         missingLoaded = false;
         overlapData = [];
+        missingData = [];
         // Reload current tab's data
         const activeTab = document.querySelector('.tab.active').dataset.tab;
         if (activeTab === 'overlap') loadOverlap();

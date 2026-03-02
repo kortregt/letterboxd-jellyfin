@@ -40,7 +40,7 @@ def fetch_tmdb_ids(slugs: list[str]) -> dict[str, str]:
                 slug, tmdb_id = future.result()
                 if tmdb_id:
                     result[slug] = tmdb_id
-                    cache.set(f"tmdb:{slug}", tmdb_id)
+                    cache.set(f"tmdb:{slug}", tmdb_id, ttl=0)
 
     return result
 

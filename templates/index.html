@@ -74,11 +74,14 @@
         <!-- Friend Overlap Tab -->
         <section id="tab-overlap" class="tab-content">
             <div class="overlap-controls">
-                <label class="toggle-label">
-                    <input type="checkbox" id="jellyfin-only">
-                    Only show movies on Jellyfin
-                </label>
-                <button id="overlap-random-btn" class="btn-primary">Pick Random from Overlap</button>
+                <div class="friend-filter" id="overlap-friend-filter"></div>
+                <div class="overlap-controls-row">
+                    <label class="toggle-label">
+                        <input type="checkbox" id="jellyfin-only">
+                        Only show movies on Jellyfin
+                    </label>
+                    <button id="overlap-random-btn" class="btn-primary">Pick Random from Overlap</button>
+                </div>
             </div>
             <div id="overlap-loading" class="loading hidden">
                 <div class="spinner"></div>
@@ -94,6 +97,9 @@
 
         <!-- Movies to Add Tab -->
         <section id="tab-missing" class="tab-content">
+            <div class="overlap-controls">
+                <div class="friend-filter" id="missing-friend-filter"></div>
+            </div>
             <div id="missing-loading" class="loading hidden">
                 <div class="spinner"></div>
                 <p>Loading watchlists...</p>
