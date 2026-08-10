@@ -106,3 +106,39 @@ class TestFriendFiltering:
     def test_any_mode_is_the_union_not_the_whole_list(self):
         result = _filter_by_friends(self.movies, ["carol"], "any")
         assert [m["name"] for m in result] == ["Alien"]
+
+
+class TestAssetVersion:
+    """Fingerprinted asset URLs, so a deploy cannot serve a stale stylesheet."""
+
+    def test_is_a_short_stable_fingerprint(self):
+        from app.routes import asset_version
+
+        first = asset_version()
+        assert len(first) == 12
+        assert asset_version() == first, "unchanged files must not churn the URL"
+
+    def test_changes_when_an_asset_changes(self, tmp_path, monkeypatch):
+        from app import routes
+
+        asset = tmp_path / "styles.css"
+        asset.write_text("body { color: red }")
+        monkeypatch.setattr(routes, "_ASSETS", (str(asset),))
+        before = routes.asset_version()
+
+        asset.write_text("body { color: blue } .segmented { display: flex }")
+        assert routes.asset_version() != before
+
+    def test_falls_back_to_a_per_boot_value_when_assets_are_missing(
+        self, monkeypatch
+    ):
+        from app import routes
+
+        monkeypatch.setattr(routes, "_ASSETS", ("does/not/exist.css",))
+        # A constant fallback would cache badly forever.
+        assert routes.asset_version() == routes._BOOT_ID
+
+    def test_template_requests_the_versioned_urls(self):
+        markup = open("templates/index.html").read()
+        assert "styles.css?v={{ asset_version }}" in markup
+        assert "app.js?v={{ asset_version }}" in markup

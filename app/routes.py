@@ -1,4 +1,6 @@
 import asyncio
+import hashlib
+import os
 import random as _random
 import threading
 import time
@@ -115,9 +117,41 @@ def _humanize(seconds: float) -> str:
 # ── pages ──
 
 
+_ASSETS = ("static/css/styles.css", "static/js/app.js")
+_BOOT_ID = f"{time.time_ns():x}"
+
+
+def asset_version() -> str:
+    """Fingerprint the static files so a deploy cannot serve a stale cache.
+
+    Starlette sends ETag and Last-Modified but no Cache-Control, which leaves
+    browsers to guess a freshness window from the file's age — Firefox will
+    happily hold a months-old stylesheet without ever revalidating. Changing
+    the URL whenever the bytes change sidesteps the guesswork entirely.
+    """
+    parts = []
+    for path in _ASSETS:
+        try:
+            stat = os.stat(path)
+        except OSError:
+            continue
+        parts.append(f"{stat.st_mtime_ns}-{stat.st_size}")
+    if not parts:
+        # Never fall back to a constant: that would cache badly forever.
+        return _BOOT_ID
+    return hashlib.sha256("|".join(parts).encode()).hexdigest()[:12]
+
+
 @router.get("/", response_class=HTMLResponse)
 async def index(request: Request):
-    return templates.TemplateResponse(request, "index.html")
+    return templates.TemplateResponse(
+        request,
+        "index.html",
+        {"asset_version": asset_version()},
+        # The page itself must never be cached, or a browser holding an old
+        # copy would keep requesting the old asset URLs and defeat the point.
+        headers={"Cache-Control": "no-cache"},
+    )
 
 
 # ── random picker ──

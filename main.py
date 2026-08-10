@@ -48,8 +48,24 @@ async def lifespan(app: FastAPI):
     close_db()
 
 
+class FingerprintedStatic(StaticFiles):
+    """Static files addressed by a content fingerprint, so they cache hard.
+
+    Starlette otherwise sends no Cache-Control and browsers invent their own
+    freshness window. Because every URL carries a ?v= that changes with the
+    bytes, a long immutable cache is both safe and what we want.
+    """
+
+    def file_response(self, *args, **kwargs):
+        response = super().file_response(*args, **kwargs)
+        response.headers.setdefault(
+            "Cache-Control", "public, max-age=31536000, immutable"
+        )
+        return response
+
+
 app = FastAPI(title="Letterboxd + Jellyfin Movie Picker", lifespan=lifespan)
-app.mount("/static", StaticFiles(directory="static"), name="static")
+app.mount("/static", FingerprintedStatic(directory="static"), name="static")
 app.include_router(router)
 
 
