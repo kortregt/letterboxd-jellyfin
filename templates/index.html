@@ -13,38 +13,40 @@
             <p class="subtitle">Letterboxd + Jellyfin</p>
         </header>
 
-        <nav class="tabs">
-            <button class="tab active" data-tab="random">Random Picker</button>
-            <button class="tab" data-tab="overlap">Friend Overlap</button>
-            <button class="tab" data-tab="missing">Movies to Add</button>
+        <div id="warnings" class="warnings hidden" role="status"></div>
+
+        <nav class="tabs" role="tablist">
+            <button class="tab active" data-tab="random" role="tab" aria-selected="true">Random Picker</button>
+            <button class="tab" data-tab="overlap" role="tab" aria-selected="false">Friend Overlap</button>
+            <button class="tab" data-tab="missing" role="tab" aria-selected="false">Movies to Add</button>
         </nav>
 
-        <!-- Random Picker Tab -->
-        <section id="tab-random" class="tab-content active">
+        <!-- Random Picker -->
+        <section id="tab-random" class="tab-content active" role="tabpanel">
             <div class="filters-section">
-                <button id="toggle-filters" class="btn-secondary">Show Filters</button>
+                <button id="toggle-filters" class="btn-secondary" aria-expanded="false">Show Filters</button>
                 <div id="filters-panel" class="filters-panel hidden">
                     <div class="filter-group">
-                        <label for="genre-select">Genre:</label>
+                        <label for="genre-select">Genre <span class="hint">(ctrl/cmd-click for several)</span></label>
                         <select id="genre-select" multiple></select>
                     </div>
                     <div class="filter-group">
-                        <label>Year Range:</label>
+                        <label for="year-min">Year range</label>
                         <div class="range-inputs">
-                            <input type="number" id="year-min" placeholder="Min" min="1900" max="2100">
+                            <input type="number" id="year-min" placeholder="Any" min="1870" max="2100" aria-label="Earliest year">
                             <span>to</span>
-                            <input type="number" id="year-max" placeholder="Max" min="1900" max="2100">
+                            <input type="number" id="year-max" placeholder="Any" min="1870" max="2100" aria-label="Latest year">
                         </div>
                     </div>
                     <div class="filter-group">
-                        <label>Runtime (min):</label>
+                        <label for="runtime-min">Runtime (minutes)</label>
                         <div class="range-inputs">
-                            <input type="number" id="runtime-min" placeholder="Min" min="0">
+                            <input type="number" id="runtime-min" placeholder="Any" min="0" max="1000" aria-label="Shortest runtime">
                             <span>to</span>
-                            <input type="number" id="runtime-max" placeholder="Max" min="0">
+                            <input type="number" id="runtime-max" placeholder="Any" min="0" max="1000" aria-label="Longest runtime">
                         </div>
                     </div>
-                    <button id="clear-filters" class="btn-secondary">Clear Filters</button>
+                    <button id="clear-filters" class="btn-secondary btn-small">Clear filters</button>
                 </div>
             </div>
             <div class="action-section">
@@ -52,67 +54,89 @@
             </div>
             <div id="random-loading" class="loading hidden">
                 <div class="spinner"></div>
-                <p>Finding a movie...</p>
+                <p>Finding a movie…</p>
             </div>
             <div id="random-error" class="error-message hidden"></div>
             <div id="movie-card" class="movie-card hidden">
                 <div class="movie-poster">
-                    <img id="movie-image" src="" alt="Movie poster">
+                    <img id="movie-image" src="" alt="">
                 </div>
                 <div class="movie-details">
                     <h2 id="movie-title"></h2>
-                    <div class="movie-meta">
-                        <span id="movie-year" class="meta-item"></span>
-                        <span id="movie-runtime" class="meta-item"></span>
-                    </div>
+                    <div id="movie-meta" class="movie-meta"></div>
                     <div id="movie-genres" class="genres"></div>
                     <p id="movie-overview" class="overview"></p>
                 </div>
             </div>
         </section>
 
-        <!-- Friend Overlap Tab -->
-        <section id="tab-overlap" class="tab-content">
-            <div class="overlap-controls">
-                <div class="friend-filter" id="overlap-friend-filter"></div>
-                <div class="overlap-controls-row">
+        <!-- Friend Overlap -->
+        <section id="tab-overlap" class="tab-content" role="tabpanel">
+            <div class="list-controls">
+                <div class="control-row">
+                    <div class="friend-filter" id="overlap-friend-filter"></div>
+                </div>
+                <div class="control-row">
+                    <div class="segmented" role="group" aria-label="Friend match mode">
+                        <label><input type="radio" name="overlap-match" value="any" checked><span>Any of them</span></label>
+                        <label><input type="radio" name="overlap-match" value="all"><span>All of them</span></label>
+                    </div>
                     <label class="toggle-label">
                         <input type="checkbox" id="jellyfin-only">
-                        Only show movies on Jellyfin
+                        On Jellyfin only
                     </label>
-                    <button id="overlap-random-btn" class="btn-primary">Pick Random from Overlap</button>
+                </div>
+                <div class="control-row">
+                    <input type="search" id="overlap-search" class="search-input" placeholder="Search these films…" aria-label="Search overlap results">
+                    <button id="overlap-random-btn" class="btn-primary">Pick From These</button>
                 </div>
             </div>
             <div id="overlap-loading" class="loading hidden">
                 <div class="spinner"></div>
-                <p>Loading watchlists...</p>
+                <p>Loading watchlists…</p>
             </div>
             <div id="overlap-error" class="error-message hidden"></div>
             <div id="overlap-random-result" class="overlap-random-result hidden"></div>
+            <p id="overlap-count" class="result-count hidden"></p>
             <div id="overlap-list" class="movie-list"></div>
-            <div id="overlap-empty" class="empty-state hidden">
-                <p>No overlapping movies found across your friends' watchlists.</p>
+            <div class="load-more-wrap">
+                <button id="overlap-more" class="btn-secondary hidden">Show more</button>
             </div>
+            <div id="overlap-empty" class="empty-state hidden"></div>
         </section>
 
-        <!-- Movies to Add Tab -->
-        <section id="tab-missing" class="tab-content">
-            <div class="overlap-controls">
-                <div class="friend-filter" id="missing-friend-filter"></div>
+        <!-- Movies to Add -->
+        <section id="tab-missing" class="tab-content" role="tabpanel">
+            <div class="list-controls">
+                <div class="control-row">
+                    <div class="friend-filter" id="missing-friend-filter"></div>
+                </div>
+                <div class="control-row">
+                    <div class="segmented" role="group" aria-label="Friend match mode">
+                        <label><input type="radio" name="missing-match" value="any" checked><span>Any of them</span></label>
+                        <label><input type="radio" name="missing-match" value="all"><span>All of them</span></label>
+                    </div>
+                </div>
+                <div class="control-row">
+                    <input type="search" id="missing-search" class="search-input" placeholder="Search these films…" aria-label="Search missing films">
+                </div>
             </div>
             <div id="missing-loading" class="loading hidden">
                 <div class="spinner"></div>
-                <p>Loading watchlists...</p>
+                <p>Loading watchlists…</p>
             </div>
             <div id="missing-error" class="error-message hidden"></div>
+            <p id="missing-count" class="result-count hidden"></p>
             <div id="missing-list" class="movie-list"></div>
-            <div id="missing-empty" class="empty-state hidden">
-                <p>All movies from your friends' watchlists are already on Jellyfin!</p>
+            <div class="load-more-wrap">
+                <button id="missing-more" class="btn-secondary hidden">Show more</button>
             </div>
+            <div id="missing-empty" class="empty-state hidden"></div>
         </section>
 
         <footer>
-            <button id="refresh-cache" class="btn-secondary btn-small">Refresh Cache</button>
+            <span id="sync-status" class="sync-status"></span>
+            <button id="refresh-cache" class="btn-secondary btn-small">Refresh data</button>
         </footer>
     </div>
 

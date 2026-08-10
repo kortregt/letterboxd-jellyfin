@@ -9,6 +9,13 @@ services:
       - .env
     volumes:
       - ./data:/app/data
+    healthcheck:
+      test: ["CMD", ".venv/bin/python", "-c",
+             "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      start_period: 15s
+      retries: 3
     networks:
       - kortregt_network
 

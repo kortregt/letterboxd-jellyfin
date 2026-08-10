@@ -1,344 +1,474 @@
-// Tab navigation
-document.querySelectorAll('.tab').forEach(tab => {
-    tab.addEventListener('click', () => {
-        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-        document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-        tab.classList.add('active');
-        document.getElementById(`tab-${tab.dataset.tab}`).classList.add('active');
+'use strict';
 
-        // Load data on first tab switch
-        if (tab.dataset.tab === 'overlap' && !overlapLoaded) loadOverlap();
-        if (tab.dataset.tab === 'missing' && !missingLoaded) loadMissing();
+const PAGE_SIZE = 50;
+const $ = (id) => document.getElementById(id);
+
+// Nodes are built rather than concatenated into HTML. Titles and usernames come
+// from scraped pages, and string interpolation into an attribute is exactly the
+// kind of thing that works until one film has a quote in its name.
+function el(tag, props, ...children) {
+    const node = document.createElement(tag);
+    for (const [key, value] of Object.entries(props || {})) {
+        if (value === null || value === undefined || value === false) continue;
+        if (key === 'class') node.className = value;
+        else if (key === 'text') node.textContent = value;
+        else if (key === 'onclick') node.addEventListener('click', value);
+        else node.setAttribute(key, value);
+    }
+    for (const child of children.flat()) {
+        if (child === null || child === undefined || child === false) continue;
+        node.append(child);
+    }
+    return node;
+}
+
+function show(node, visible) {
+    node.classList.toggle('hidden', !visible);
+}
+
+function debounce(fn, ms) {
+    let timer;
+    return (...args) => {
+        clearTimeout(timer);
+        timer = setTimeout(() => fn(...args), ms);
+    };
+}
+
+async function getJSON(url) {
+    const response = await fetch(url);
+    let body = {};
+    try {
+        body = await response.json();
+    } catch {
+        // Fall through to the status-based message below.
+    }
+    if (!response.ok) {
+        throw new Error(body.error || `Request failed (${response.status})`);
+    }
+    return body;
+}
+
+function relativeTime(epochSeconds) {
+    const seconds = Math.max(0, Math.floor(Date.now() / 1000 - epochSeconds));
+    if (seconds < 60) return 'just now';
+    const minutes = Math.floor(seconds / 60);
+    if (minutes < 60) return `${minutes}m ago`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `${hours}h ago`;
+    return `${Math.floor(hours / 24)}d ago`;
+}
+
+// ── shared state ──
+
+const state = {
+    friends: [],
+    nicknames: {},
+};
+
+const displayName = (username) => state.nicknames[username] || username;
+
+function renderWarnings(warnings) {
+    const box = $('warnings');
+    box.replaceChildren();
+    if (!warnings || !warnings.length) {
+        show(box, false);
+        return;
+    }
+    for (const warning of warnings) {
+        box.append(el('div', { class: 'warning-item', text: warning }));
+    }
+    show(box, true);
+}
+
+function setSyncStatus(generatedAt) {
+    if (generatedAt) {
+        $('sync-status').textContent = `Synced ${relativeTime(generatedAt)}`;
+    }
+}
+
+// ── tabs ──
+
+document.querySelectorAll('.tab').forEach((tab) => {
+    tab.addEventListener('click', () => {
+        document.querySelectorAll('.tab').forEach((t) => {
+            t.classList.remove('active');
+            t.setAttribute('aria-selected', 'false');
+        });
+        document.querySelectorAll('.tab-content').forEach((c) => c.classList.remove('active'));
+        tab.classList.add('active');
+        tab.setAttribute('aria-selected', 'true');
+        $(`tab-${tab.dataset.tab}`).classList.add('active');
+
+        if (tab.dataset.tab === 'overlap') overlapView.ensureLoaded();
+        if (tab.dataset.tab === 'missing') missingView.ensureLoaded();
     });
 });
 
-// State
-let overlapLoaded = false;
-let missingLoaded = false;
-let overlapData = [];
-let missingData = [];
-let allFriends = [];
-let nicknames = {};
+// ── random picker ──
 
-// ── Random Picker ──
-
-document.addEventListener('DOMContentLoaded', () => { loadGenres(); loadFriends(); });
-
-document.getElementById('get-movie-btn').addEventListener('click', fetchRandomMovie);
-document.getElementById('toggle-filters').addEventListener('click', () => {
-    const panel = document.getElementById('filters-panel');
-    panel.classList.toggle('hidden');
-    document.getElementById('toggle-filters').textContent =
-        panel.classList.contains('hidden') ? 'Show Filters' : 'Hide Filters';
+$('toggle-filters').addEventListener('click', () => {
+    const panel = $('filters-panel');
+    const hidden = panel.classList.toggle('hidden');
+    $('toggle-filters').textContent = hidden ? 'Show Filters' : 'Hide Filters';
+    $('toggle-filters').setAttribute('aria-expanded', String(!hidden));
 });
-document.getElementById('clear-filters').addEventListener('click', () => {
-    document.getElementById('genre-select').selectedIndex = -1;
-    ['year-min', 'year-max', 'runtime-min', 'runtime-max'].forEach(id => {
-        document.getElementById(id).value = '';
+
+$('clear-filters').addEventListener('click', () => {
+    $('genre-select').selectedIndex = -1;
+    ['year-min', 'year-max', 'runtime-min', 'runtime-max'].forEach((id) => {
+        $(id).value = '';
     });
 });
 
 async function loadGenres() {
     try {
-        const res = await fetch('/api/genres');
-        if (!res.ok) return;
-        const data = await res.json();
-        const select = document.getElementById('genre-select');
-        select.innerHTML = '';
-        data.genres.forEach(g => {
-            const opt = document.createElement('option');
-            opt.value = g;
-            opt.textContent = g;
-            select.appendChild(opt);
-        });
+        const data = await getJSON('/api/genres');
+        const select = $('genre-select');
+        select.replaceChildren(
+            ...data.genres.map((g) => el('option', { value: g, text: g }))
+        );
     } catch (e) {
         console.error('Failed to load genres:', e);
     }
 }
 
-function getFilterParams() {
+function randomFilterParams() {
     const params = new URLSearchParams();
-    const genres = Array.from(document.getElementById('genre-select').selectedOptions)
-        .map(o => o.value);
-    if (genres.length) params.append('genres', genres.join(','));
-    ['year_min', 'year_max', 'runtime_min', 'runtime_max'].forEach(key => {
-        const val = document.getElementById(key.replace('_', '-')).value;
-        if (val) params.append(key, val);
-    });
-    return params.toString();
+    const genres = Array.from($('genre-select').selectedOptions).map((o) => o.value);
+    if (genres.length) params.set('genres', genres.join(','));
+    for (const [key, id] of [
+        ['year_min', 'year-min'],
+        ['year_max', 'year-max'],
+        ['runtime_min', 'runtime-min'],
+        ['runtime_max', 'runtime-max'],
+    ]) {
+        const value = $(id).value.trim();
+        if (value) params.set(key, value);
+    }
+    return params;
 }
 
-async function fetchRandomMovie() {
-    const card = document.getElementById('movie-card');
-    const error = document.getElementById('random-error');
-    const loading = document.getElementById('random-loading');
-    const btn = document.getElementById('get-movie-btn');
-
-    card.classList.add('hidden');
-    error.classList.add('hidden');
-    loading.classList.remove('hidden');
-    btn.disabled = true;
+$('get-movie-btn').addEventListener('click', async () => {
+    const button = $('get-movie-btn');
+    show($('movie-card'), false);
+    show($('random-error'), false);
+    show($('random-loading'), true);
+    button.disabled = true;
 
     try {
-        const params = getFilterParams();
-        const res = await fetch(`/api/random-movie${params ? '?' + params : ''}`);
-        const data = await res.json();
-        if (res.ok) {
-            displayMovie(data);
-        } else {
-            showError('random-error', data.error || 'Failed to fetch movie');
-        }
+        const params = randomFilterParams().toString();
+        const movie = await getJSON(`/api/random-movie${params ? `?${params}` : ''}`);
+        displayMovie(movie);
     } catch (e) {
-        showError('random-error', 'Network error: unable to connect to server');
+        $('random-error').textContent = e.message;
+        show($('random-error'), true);
     } finally {
-        loading.classList.add('hidden');
-        btn.disabled = false;
+        show($('random-loading'), false);
+        button.disabled = false;
     }
-}
+});
 
 function displayMovie(movie) {
-    document.getElementById('movie-title').textContent = movie.name;
-    document.getElementById('movie-year').textContent = movie.year || '';
-    document.getElementById('movie-runtime').textContent =
-        movie.runtime ? `${movie.runtime} min` : '';
+    $('movie-title').textContent = movie.name || 'Untitled';
 
-    const genresEl = document.getElementById('movie-genres');
-    genresEl.innerHTML = '';
-    (movie.genres || []).forEach(g => {
-        const tag = document.createElement('span');
-        tag.className = 'genre-tag';
-        tag.textContent = g;
-        genresEl.appendChild(tag);
-    });
+    const meta = [];
+    if (movie.year) meta.push(String(movie.year));
+    if (movie.runtime) meta.push(`${movie.runtime} min`);
+    if (movie.official_rating) meta.push(movie.official_rating);
+    if (movie.community_rating) meta.push(`★ ${movie.community_rating.toFixed(1)}`);
+    $('movie-meta').replaceChildren(
+        ...meta.map((item) => el('span', { class: 'meta-item', text: item }))
+    );
 
-    document.getElementById('movie-overview').textContent =
-        movie.overview || 'No overview available.';
+    $('movie-genres').replaceChildren(
+        ...(movie.genres || []).map((g) => el('span', { class: 'genre-tag', text: g }))
+    );
 
-    const img = document.getElementById('movie-image');
-    if (movie.image_url) {
-        img.src = movie.image_url;
-        img.alt = `${movie.name} poster`;
-    } else {
-        img.src = '';
-        img.alt = 'No poster available';
-    }
+    $('movie-overview').textContent = movie.overview || 'No overview available.';
 
-    document.getElementById('movie-card').classList.remove('hidden');
+    const img = $('movie-image');
+    img.src = movie.image_url || '';
+    img.alt = movie.image_url ? `${movie.name} poster` : '';
+
+    show($('movie-card'), true);
 }
 
-// ── Friend Filter ──
+// ── friend chips ──
 
 async function loadFriends() {
     try {
-        const res = await fetch('/api/friends');
-        if (!res.ok) return;
-        const data = await res.json();
-        allFriends = data.friends || [];
-        nicknames = data.nicknames || {};
-        renderFriendFilter('overlap-friend-filter', renderOverlap);
-        renderFriendFilter('missing-friend-filter', renderMissing);
+        const data = await getJSON('/api/friends');
+        state.friends = data.friends || [];
+        state.nicknames = data.nicknames || {};
     } catch (e) {
         console.error('Failed to load friends:', e);
     }
+    overlapView.renderChips();
+    missingView.renderChips();
 }
 
-function displayName(username) {
-    return nicknames[username] || username;
-}
+// ── list views (overlap & missing) ──
 
-function renderFriendFilter(containerId, onChange) {
-    const container = document.getElementById(containerId);
-    container.innerHTML = allFriends.map(f => `
-        <label class="friend-chip">
-            <input type="checkbox" value="${esc(f)}" checked>
-            <span>${esc(displayName(f))}</span>
-        </label>
-    `).join('');
-    container.querySelectorAll('input').forEach(cb => {
-        cb.addEventListener('change', onChange);
-    });
-}
+function createListView(config) {
+    const { name, endpoint, showAvailability } = config;
+    let all = [];
+    let visible = PAGE_SIZE;
+    let loaded = false;
+    let inFlight = 0;
 
-function getSelectedFriends(containerId) {
-    return Array.from(document.querySelectorAll(`#${containerId} input:checked`))
-        .map(cb => cb.value);
-}
+    const listNode = $(`${name}-list`);
+    const emptyNode = $(`${name}-empty`);
+    const countNode = $(`${name}-count`);
+    const moreNode = $(`${name}-more`);
+    const errorNode = $(`${name}-error`);
+    const loadingNode = $(`${name}-loading`);
+    const searchNode = $(`${name}-search`);
+    const chipsNode = $(`${name}-friend-filter`);
 
-function filterByFriends(movies, selectedFriends) {
-    if (selectedFriends.length === allFriends.length) return movies;
-    return movies.filter(m =>
-        selectedFriends.every(f => (m.wanted_by || []).includes(f))
+    function selectedFriends() {
+        return Array.from(chipsNode.querySelectorAll('input:checked')).map((cb) => cb.value);
+    }
+
+    function matchMode() {
+        const checked = document.querySelector(`input[name="${name}-match"]:checked`);
+        return checked ? checked.value : 'any';
+    }
+
+    function queryParams() {
+        const params = new URLSearchParams();
+        const friends = selectedFriends();
+        // Every chip selected is the same as no constraint; sending the whole
+        // list would make "all of them" mean "wanted by literally everyone".
+        if (friends.length && friends.length < state.friends.length) {
+            params.set('friends', friends.join(','));
+            params.set('match', matchMode());
+        } else if (friends.length === state.friends.length && matchMode() === 'all') {
+            params.set('friends', friends.join(','));
+            params.set('match', 'all');
+        }
+        if (showAvailability && $('jellyfin-only').checked) {
+            params.set('jellyfin_only', 'true');
+        }
+        return params;
+    }
+
+    function searchTerm() {
+        return searchNode.value.trim().toLowerCase();
+    }
+
+    function filtered() {
+        const term = searchTerm();
+        if (!term) return all;
+        return all.filter((movie) => (movie.name || '').toLowerCase().includes(term));
+    }
+
+    function movieRow(movie) {
+        const title = movie.url
+            ? el('a', { href: movie.url, target: '_blank', rel: 'noopener noreferrer', text: movie.name })
+            : document.createTextNode(movie.name || '');
+
+        const info = el(
+            'div',
+            { class: 'movie-info' },
+            el(
+                'div',
+                { class: 'movie-title' },
+                title,
+                movie.year ? el('span', { class: 'movie-year', text: `(${movie.year})` }) : null
+            ),
+            el(
+                'div',
+                { class: 'movie-badges' },
+                (movie.wanted_by || []).map((friend) =>
+                    el('span', { class: 'friend-badge', text: displayName(friend) })
+                )
+            )
+        );
+
+        const status = showAvailability
+            ? el('span', {
+                  class: `jellyfin-status ${movie.on_jellyfin ? 'available' : 'unavailable'}`,
+                  text: movie.on_jellyfin ? 'On Jellyfin' : 'Not on server',
+              })
+            : null;
+
+        return el('div', { class: 'movie-list-item' }, info, status);
+    }
+
+    function render() {
+        const movies = filtered();
+        const page = movies.slice(0, visible);
+
+        listNode.replaceChildren(...page.map(movieRow));
+
+        const hasResults = movies.length > 0;
+        show(countNode, hasResults);
+        countNode.textContent = hasResults
+            ? `Showing ${page.length} of ${movies.length} film${movies.length === 1 ? '' : 's'}`
+            : '';
+
+        show(moreNode, movies.length > page.length);
+        moreNode.textContent = `Show ${Math.min(PAGE_SIZE, movies.length - page.length)} more`;
+
+        show(emptyNode, !hasResults);
+        if (!hasResults) {
+            emptyNode.replaceChildren(el('p', { text: emptyMessage() }));
+        }
+    }
+
+    function emptyMessage() {
+        if (searchTerm()) return `No films matching “${searchNode.value.trim()}”.`;
+        if (name === 'overlap') {
+            return 'No films match these filters. Try selecting fewer friends, or switch to “Any of them”.';
+        }
+        return 'Nothing missing — every film on these watchlists is already on your server.';
+    }
+
+    async function load() {
+        const request = ++inFlight;
+        show(loadingNode, true);
+        show(errorNode, false);
+        try {
+            const params = queryParams().toString();
+            const data = await getJSON(`${endpoint}${params ? `?${params}` : ''}`);
+            // A slower earlier request must not overwrite a newer result.
+            if (request !== inFlight) return;
+            all = data.movies || [];
+            visible = PAGE_SIZE;
+            loaded = true;
+            renderWarnings(data.warnings);
+            setSyncStatus(data.generated_at);
+            render();
+        } catch (e) {
+            if (request !== inFlight) return;
+            errorNode.textContent = e.message;
+            show(errorNode, true);
+            listNode.replaceChildren();
+            show(countNode, false);
+            show(moreNode, false);
+        } finally {
+            if (request === inFlight) show(loadingNode, false);
+        }
+    }
+
+    function renderChips() {
+        chipsNode.replaceChildren(
+            ...state.friends.map((friend) => {
+                const input = el('input', { type: 'checkbox', value: friend, checked: 'checked' });
+                input.addEventListener('change', load);
+                return el('label', { class: 'friend-chip' }, input, el('span', { text: displayName(friend) }));
+            })
+        );
+    }
+
+    searchNode.addEventListener(
+        'input',
+        debounce(() => {
+            visible = PAGE_SIZE;
+            render();
+        }, 150)
     );
+
+    moreNode.addEventListener('click', () => {
+        visible += PAGE_SIZE;
+        render();
+    });
+
+    document.querySelectorAll(`input[name="${name}-match"]`).forEach((radio) => {
+        radio.addEventListener('change', load);
+    });
+
+    return {
+        renderChips,
+        reload: load,
+        ensureLoaded: () => {
+            if (!loaded) load();
+        },
+        invalidate: () => {
+            loaded = false;
+        },
+        queryParams,
+        isLoaded: () => loaded,
+    };
 }
 
-// ── Friend Overlap ──
+const overlapView = createListView({
+    name: 'overlap',
+    endpoint: '/api/overlap',
+    showAvailability: true,
+});
 
-document.getElementById('overlap-random-btn').addEventListener('click', pickRandomOverlap);
-document.getElementById('jellyfin-only').addEventListener('change', renderOverlap);
+const missingView = createListView({
+    name: 'missing',
+    endpoint: '/api/missing',
+    showAvailability: false,
+});
 
-async function loadOverlap() {
-    const loading = document.getElementById('overlap-loading');
-    const error = document.getElementById('overlap-error');
-    loading.classList.remove('hidden');
-    error.classList.add('hidden');
+$('jellyfin-only').addEventListener('change', () => overlapView.reload());
 
+$('overlap-random-btn').addEventListener('click', async () => {
+    const button = $('overlap-random-btn');
+    const result = $('overlap-random-result');
+    button.disabled = true;
     try {
-        const res = await fetch('/api/overlap');
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error);
-        overlapData = data.movies || [];
-        overlapLoaded = true;
-        renderOverlap();
+        // Same parameters as the list, so the pick always comes from what the
+        // user can actually see rather than the whole unfiltered set.
+        const params = overlapView.queryParams().toString();
+        const movie = await getJSON(`/api/overlap/random${params ? `?${params}` : ''}`);
+        result.replaceChildren(
+            el('div', { class: 'picked-title', text: movie.name }),
+            movie.year ? el('div', { class: 'picked-year', text: String(movie.year) }) : null,
+            el(
+                'div',
+                { class: 'picked-friends' },
+                (movie.wanted_by || []).map((friend) =>
+                    el('span', { class: 'friend-badge', text: displayName(friend) })
+                )
+            ),
+            el('div', { class: 'picked-status', text: movie.on_jellyfin ? 'On Jellyfin' : 'Not on your server' }),
+            movie.url
+                ? el('a', {
+                      class: 'picked-link',
+                      href: movie.url,
+                      target: '_blank',
+                      rel: 'noopener noreferrer',
+                      text: 'View on Letterboxd',
+                  })
+                : null
+        );
+        show(result, true);
+        show($('overlap-error'), false);
     } catch (e) {
-        showError('overlap-error', e.message || 'Failed to load watchlists');
+        show(result, false);
+        $('overlap-error').textContent = e.message;
+        show($('overlap-error'), true);
     } finally {
-        loading.classList.add('hidden');
-    }
-}
-
-function renderOverlap() {
-    const list = document.getElementById('overlap-list');
-    const empty = document.getElementById('overlap-empty');
-    const jellyfinOnly = document.getElementById('jellyfin-only').checked;
-    const selectedFriends = getSelectedFriends('overlap-friend-filter');
-
-    let movies = filterByFriends(overlapData, selectedFriends);
-    if (jellyfinOnly) {
-        movies = movies.filter(m => m.on_jellyfin);
-    }
-
-    if (!movies.length) {
-        list.innerHTML = '';
-        empty.classList.remove('hidden');
-        return;
-    }
-    empty.classList.add('hidden');
-    list.innerHTML = movies.map(m => movieListItem(m, true)).join('');
-}
-
-async function pickRandomOverlap() {
-    const jellyfinOnly = document.getElementById('jellyfin-only').checked;
-    const result = document.getElementById('overlap-random-result');
-
-    try {
-        const res = await fetch(`/api/overlap/random?jellyfin_only=${jellyfinOnly}`);
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error);
-
-        result.innerHTML = `
-            <div class="picked-title">${esc(data.name)}</div>
-            <div class="picked-year">${data.year || ''}</div>
-            <div class="picked-friends">
-                ${(data.wanted_by || []).map(f => `<span class="friend-badge">${esc(displayName(f))}</span>`).join(' ')}
-            </div>
-            ${data.url ? `<a href="${esc(data.url)}" target="_blank" style="color: var(--primary); font-size: 0.85rem;">View on Letterboxd</a>` : ''}
-        `;
-        result.classList.remove('hidden');
-    } catch (e) {
-        showError('overlap-error', e.message);
-    }
-}
-
-// ── Movies to Add ──
-
-async function loadMissing() {
-    const loading = document.getElementById('missing-loading');
-    const error = document.getElementById('missing-error');
-    loading.classList.remove('hidden');
-    error.classList.add('hidden');
-
-    try {
-        const res = await fetch('/api/missing');
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error);
-
-        missingData = data.movies || [];
-        missingLoaded = true;
-        renderMissing();
-    } catch (e) {
-        showError('missing-error', e.message || 'Failed to load data');
-    } finally {
-        loading.classList.add('hidden');
-    }
-}
-
-function renderMissing() {
-    const list = document.getElementById('missing-list');
-    const empty = document.getElementById('missing-empty');
-    const selectedFriends = getSelectedFriends('missing-friend-filter');
-
-    const movies = filterByFriends(missingData, selectedFriends);
-
-    if (!movies.length) {
-        list.innerHTML = '';
-        empty.classList.remove('hidden');
-        return;
-    }
-    empty.classList.add('hidden');
-    list.innerHTML = movies.map(m => movieListItem(m, false)).join('');
-}
-
-// ── Shared helpers ──
-
-function movieListItem(movie, showJellyfinStatus) {
-    const link = movie.url
-        ? `<a href="${esc(movie.url)}" target="_blank">${esc(movie.name)}</a>`
-        : esc(movie.name);
-    const year = movie.year ? `<span class="movie-year">(${movie.year})</span>` : '';
-    const badges = (movie.wanted_by || [])
-        .map(f => `<span class="friend-badge">${esc(displayName(f))}</span>`).join('');
-
-    let statusHtml = '';
-    if (showJellyfinStatus) {
-        statusHtml = movie.on_jellyfin
-            ? '<span class="jellyfin-status available">On Jellyfin</span>'
-            : '<span class="jellyfin-status unavailable">Not on server</span>';
-    }
-
-    return `
-        <div class="movie-list-item">
-            <div class="movie-info">
-                <div class="movie-title">${link} ${year}</div>
-                <div class="movie-badges">${badges}</div>
-            </div>
-            ${statusHtml}
-        </div>
-    `;
-}
-
-function showError(elementId, message) {
-    const el = document.getElementById(elementId);
-    el.textContent = message;
-    el.classList.remove('hidden');
-}
-
-function esc(str) {
-    if (!str) return '';
-    const div = document.createElement('div');
-    div.textContent = str;
-    return div.innerHTML;
-}
-
-// ── Cache refresh ──
-
-document.getElementById('refresh-cache').addEventListener('click', async () => {
-    const btn = document.getElementById('refresh-cache');
-    btn.disabled = true;
-    btn.textContent = 'Refreshing...';
-    try {
-        await fetch('/api/cache/refresh', { method: 'POST' });
-        overlapLoaded = false;
-        missingLoaded = false;
-        overlapData = [];
-        missingData = [];
-        // Reload current tab's data
-        const activeTab = document.querySelector('.tab.active').dataset.tab;
-        if (activeTab === 'overlap') loadOverlap();
-        if (activeTab === 'missing') loadMissing();
-    } catch (e) {
-        console.error('Failed to refresh cache:', e);
-    } finally {
-        btn.disabled = false;
-        btn.textContent = 'Refresh Cache';
+        button.disabled = false;
     }
 });
+
+// ── refresh ──
+
+$('refresh-cache').addEventListener('click', async () => {
+    const button = $('refresh-cache');
+    button.disabled = true;
+    button.textContent = 'Refreshing…';
+    try {
+        await fetch('/api/cache/refresh', { method: 'POST' });
+        overlapView.invalidate();
+        missingView.invalidate();
+        const active = document.querySelector('.tab.active').dataset.tab;
+        if (active === 'overlap') overlapView.reload();
+        else if (active === 'missing') missingView.reload();
+    } catch (e) {
+        console.error('Failed to refresh:', e);
+    } finally {
+        button.disabled = false;
+        button.textContent = 'Refresh data';
+    }
+});
+
+// ── boot ──
+
+loadGenres();
+loadFriends();
